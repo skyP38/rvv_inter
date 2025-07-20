@@ -8,7 +8,7 @@ object LambdaTests {
     testParser()
 
     testEvaluation()
-    
+    testTypeInference()
 
     println("=" * 30)
     println("Tests completed")
@@ -17,12 +17,12 @@ object LambdaTests {
   private def testParser(): Unit = {
     println("\n[Parser Tests]")
     val parserCases = List(
-        "x"     -> "Var(x)",
-        "x y"   -> "App(Var(x),Var(y))",
-        "x y z" -> "App(App(Var(x),Var(y)),Var(z))",
-        "λx.x"  -> "Abs(Var(x),Var(x))",
-        "(λx.x y) z" -> "App(Abs(Var(x),App(Var(x),Var(y))),Var(z))",
-        "λx.λy.x y"  -> "Abs(Var(x),Abs(Var(y),App(Var(x),Var(y))))"
+      "x"     -> "Var(x)",
+      "x y"   -> "App(Var(x),Var(y))",
+      "x y z" -> "App(App(Var(x),Var(y)),Var(z))",
+      "λx.x"  -> "Abs(Var(x),Var(x))",
+      "(λx.x y) z" -> "App(Abs(Var(x),App(Var(x),Var(y))),Var(z))",
+      "λx.λy.x y"  -> "Abs(Var(x),Abs(Var(y),App(Var(x),Var(y))))"
     )
     
     parserCases.foreach { case (input, expected) =>
@@ -41,7 +41,7 @@ object LambdaTests {
     }
   }
 
-   private def testEvaluation(): Unit = {
+  private def testEvaluation(): Unit = {
     println("\n[Evaluation Tests]")
     val testCases = List(
       // Базовые примеры
@@ -82,5 +82,54 @@ object LambdaTests {
           println(s"✗ Parse error: $error")
       }
     }
-   }  
+  }
+
+  private def testTypeInference(): Unit = {
+    println("\n[Type Inference Tests]")
+
+    // Функция для структурного сравнения типов
+    def typeStructureEqual(actual: Type, expected: Type): Boolean = {
+      (actual, expected) match {
+        case (TyVar(_), TyVar(_)) => true
+        case (TyArrow(a1, a2), TyArrow(b1, b2)) => 
+          typeStructureEqual(a1, b1) && typeStructureEqual(a2, b2)
+        case _ => false
+      }
+    }
+
+    val testCases = List(
+      ("λx.x", "λx.x"),
+      ("λx.λy.x", "λx.λy.x"),
+      ("λf.λx.f (f x)", "λf.λx.f (f x)"),
+      ("0", "λf.λx.x"),
+      ("1", "λf.λx.f x"),
+      ("2", "λf.λx.f (f x)")
+    )
+    testCases.foreach { case (input, expectedPattern) =>
+      print(s"Testing type of '$input'... ")
+      
+        val inputType = for {
+          expr <- LambdaParser.parse(input)
+          typ <- TypeInference.infer(expr)
+        } yield typ
+
+        val expectedType = for {
+          expr <- LambdaParser.parse(expectedPattern)
+          typ <- TypeInference.infer(expr)
+        } yield typ
+
+        (inputType, expectedType) match {
+          case (Right(inputTy), Right(expectedTy)) =>
+            if (typeStructureEqual(inputTy, expectedTy)) {
+              println("✓")
+            } else {
+              println(s"✗ (got '${LambdaPrinter.prettyPrintType(inputTy)}', " +
+                    s"expected '${LambdaPrinter.prettyPrintType(expectedTy)}')")
+            }
+            
+          case (Left(err), _) => println(s"✗ Error in input: $err")
+          case (_, Left(err)) => println(s"✗ Error in pattern: $err")
+        }
+    }
+  }
 }

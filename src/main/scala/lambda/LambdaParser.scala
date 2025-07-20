@@ -21,11 +21,18 @@ object LambdaParser {
       result
     }
   }
-  
-  def atom[$: P]: P[LambdaExpr] = {
-    P( variable | "(" ~ expr ~ ")" ).map { expr =>
-      expr
+
+  def churchNumeral[$: P]: P[LambdaExpr] = {
+    P( CharIn("0-9").rep(1).! ).map { numStr =>
+      val n = numStr.toInt
+      (1 to n).foldLeft[LambdaExpr](Abs(Var("s"), Abs(Var("z"), Var("z")))) {
+        case (acc, _) => Abs(Var("s"), Abs(Var("z"), App(Var("s"), acc)))
+      }
     }
+  }
+
+  def atom[$: P]: P[LambdaExpr] = {
+    P( variable | churchNumeral | "(" ~ expr ~ ")" )
   }
   
   def expr[$: P]: P[LambdaExpr] = {
